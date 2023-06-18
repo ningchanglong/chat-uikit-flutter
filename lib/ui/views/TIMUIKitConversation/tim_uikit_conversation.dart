@@ -68,6 +68,10 @@ class TIMUIKitConversation extends StatefulWidget {
   /// to meet the identifier shows here.
   final bool isShowDraft;
 
+  final List<Widget>? topSlivers;
+
+  final List<Widget>? bottomSlivers;
+
   const TIMUIKitConversation(
       {Key? key,
       this.lifeCycle,
@@ -80,7 +84,9 @@ class TIMUIKitConversation extends StatefulWidget {
       this.conversationCollector,
       this.emptyBuilder,
       this.lastMessageBuilder,
-      this.isShowOnlineStatus = true})
+      this.isShowOnlineStatus = true,
+      this.topSlivers,
+      this.bottomSlivers,})
       : super(key: key);
 
   @override
@@ -336,6 +342,119 @@ class _TIMUIKitConversationState extends TIMUIKitState<TIMUIKitConversation> {
           }
 
           Widget conversationList() {
+            return CustomScrollView(
+              controller: _autoScrollController,
+              shrinkWrap: true,
+              slivers: [
+                ...widget.topSlivers??[],
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index == filteredConversationList.length - 1) {
+                        if (haveMoreData) {
+                          _timuiKitConversationController.loadData();
+                        }
+                      }
+                      final conversationItem = filteredConversationList[index];
+
+                      final V2TimUserStatus? onlineStatus =
+                      _friendShipViewModel.userStatusList.firstWhere(
+                              (item) => item.userID == conversationItem?.userID,
+                          orElse: () => V2TimUserStatus(statusType: 0));
+                      if (widget.itemBuilder != null) {
+                        return widget.itemBuilder!(
+                            conversationItem!, onlineStatus);
+                      }
+
+                      final slideChildren =
+                      _getSlideBuilder()(conversationItem!);
+
+                      final isCurrent = conversationItem.conversationID ==
+                          model.selectedConversation?.conversationID;
+
+                      final isPined = conversationItem.isPinned ?? false;
+                      Widget conversationLineItem() {
+                        return Material(
+                          color: (isCurrent && isDesktopScreen)
+                              ? theme.conversationItemChooseBgColor
+                              : isPined
+                              ? theme.conversationItemPinedBgColor
+                              : theme.conversationItemBgColor,
+                          child: InkWell(
+                            child: TIMUIKitConversationItem(
+                                isCurrent: isCurrent,
+                                isShowDraft: widget.isShowDraft,
+                                lastMessageBuilder: widget.lastMessageBuilder,
+                                faceUrl: conversationItem.faceUrl ?? "",
+                                nickName: conversationItem.showName ?? "",
+                                isDisturb: conversationItem.recvOpt != 0,
+                                lastMsg: conversationItem.lastMessage,
+                                isPined: isPined,
+                                groupAtInfoList:
+                                conversationItem.groupAtInfoList ?? [],
+                                unreadCount: conversationItem.unreadCount ?? 0,
+                                draftText: conversationItem.draftText,
+                                onlineStatus: (widget.isShowOnlineStatus &&
+                                    conversationItem.userID != null &&
+                                    conversationItem.userID!.isNotEmpty)
+                                    ? onlineStatus
+                                    : null,
+                                draftTimestamp: conversationItem.draftTimestamp,
+                                convType: conversationItem.type),
+                            onTap: () => onTapConvItem(conversationItem),
+                          ),
+                        );
+                      }
+                      return TUIKitScreenUtils.getDeviceWidget(
+                          desktopWidget: AutoScrollTag(
+                            key: ValueKey(conversationItem.conversationID),
+                            controller: _autoScrollController,
+                            index: index,
+                            child: GestureDetector(
+                              onSecondaryTapDown: (details) {
+                                TUIKitWidePopup.showPopupWindow(
+                                    operationKey: TUIKitWideModalOperationKey
+                                        .conversationSecondaryMenu,
+                                    isDarkBackground: false,
+                                    borderRadius: const BorderRadius.all(
+                                        Radius.circular(4)),
+                                    context: context,
+                                    offset: Offset(
+                                        min(
+                                            details.globalPosition.dx,
+                                            MediaQuery.of(context).size.width -
+                                                80),
+                                        min(
+                                            details.globalPosition.dy,
+                                            MediaQuery.of(context).size.height -
+                                                130)),
+                                    child: (onClose) => _getSecondaryMenu(
+                                        conversationItem, onClose));
+                              },
+                              child: conversationLineItem(),
+                            ),
+                          ),
+                          defaultWidget: AutoScrollTag(
+                            key: ValueKey(conversationItem.conversationID),
+                            controller: _autoScrollController,
+                            index: index,
+                            child: Slidable(
+                                groupTag: 'conversation-list',
+                                child: conversationLineItem(),
+                                endActionPane: ActionPane(
+                                    extentRatio:
+                                    slideChildren.length > 2 ? 0.77 : 0.5,
+                                    motion: const DrawerMotion(),
+                                    children: slideChildren)),
+                          ));
+                      return Container();
+                    },
+                    childCount: filteredConversationList.length,
+                  ),
+                ),
+                ...widget.bottomSlivers??[],
+              ],
+            );
             return filteredConversationList.isNotEmpty
                 ? ListView.builder(
                     controller: _autoScrollController,

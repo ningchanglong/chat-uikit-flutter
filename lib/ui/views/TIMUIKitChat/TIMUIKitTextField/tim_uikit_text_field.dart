@@ -199,7 +199,8 @@ class _InputTextFieldState extends TIMUIKitState<TIMUIKitInputTextField> {
       // _addDeleteTag();
     } else {
       text = originalText.characters.skipLast(1);
-      textEditingController.text = text;
+      debugPrint('---> backSpaceText text: ${text}');
+      textEditingController.text = text.toString();
       // handleSetDraftText();
     }
   }
